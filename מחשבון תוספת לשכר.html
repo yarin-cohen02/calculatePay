@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>מחשבון תוספת שכר נטו</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Alef:wght@400;700&display=swap');
+
+    body {
+      font-family: "Alef", Arial, sans-serif;
+      background: linear-gradient(180deg, #f3f6fb 0%, #eef3f9 100%);
+      margin: 0;
+      padding: 40px 16px;
+      direction: rtl;
+      text-align: right;
+    }
+
+    .container {
+      max-width: 760px;
+      margin: auto;
+      background: #ffffff;
+      padding: 28px;
+      border-radius: 14px;
+      box-shadow: 0 8px 30px rgba(20, 40, 80, 0.08);
+      border: 1px solid rgba(15, 40, 80, 0.04);
+    }
+
+    h1 {
+      margin: 0 0 12px 0;
+      font-size: 24px;
+      color: #0b2540;
+      text-align: center;
+    }
+
+    .row {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .field {
+      flex: 1 1 220px;
+      min-width: 220px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      color: #234;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    input[type="number"] {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid #d6e0ee;
+      font-size: 16px;
+      box-sizing: border-box;
+      background: #fbfdff;
+    }
+
+    .checkbox-group {
+      margin-top: 18px;
+      padding: 14px;
+      border-radius: 12px;
+      background: linear-gradient(180deg, #fbfdff, #f7fbff);
+      border: 1px solid #e6eef9;
+    }
+
+    .checkbox-group label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 500;
+      color: #123;
+      margin: 8px 0;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 18px;
+      padding: 14px;
+      background: linear-gradient(90deg, #006ef6, #0051c7);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 17px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .result {
+      margin-top: 22px;
+      padding: 18px;
+      border-radius: 12px;
+      background: #ffffff;
+      border: 1px solid #e6eef9;
+      font-size: 16px;
+      line-height: 1.7;
+      color: #123;
+    }
+
+    h3 {
+      color: #006ef6;
+      margin: 0 0 8px 0;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>מחשבון תוספת שכר נטו</h1>
+
+    <div class="row">
+      <div class="field">
+        <label for="currentSalary">שכר ברוטו נוכחי (₪)</label>
+        <input type="number" id="currentSalary" value="22000" min="0" step="1" />
+      </div>
+
+      <div class="field">
+        <label for="raiseAmount">תוספת ברוטו צפויה (₪)</label>
+        <input type="number" id="raiseAmount" value="5000" min="0" step="1" />
+      </div>
+    </div>
+
+    <div class="checkbox-group">
+      <label><input type="checkbox" id="pension" checked> הפרשה לפנסיה (6%)</label>
+      <label><input type="checkbox" id="hishtalmut" checked> קרן השתלמות (2.5%)</label>
+      <label><input type="checkbox" id="bituachLeumi" checked> ביטוח לאומי + בריאות (2025)</label>
+    </div>
+
+    <button id="calcBtn">חשב תוספת נטו</button>
+
+    <div class="result" id="result"></div>
+  </div>
+
+  <script>
+    const TAX_BRACKETS_2025 = [
+      { limit: 7940, rate: 0.10 },
+      { limit: 11990, rate: 0.14 },
+      { limit: 19230, rate: 0.20 },
+      { limit: 41410, rate: 0.31 },
+      { limit: 53920, rate: 0.35 },
+      { limit: Infinity, rate: 0.47 }
+    ];
+
+    function calculateBL(gross) {
+      const lowLimit = 7522;
+      const highLimit = 49030;
+      const lowRate = 0.035;
+      const highRate = 0.12;
+
+      let total = 0;
+
+      if (gross <= lowLimit) return gross * lowRate;
+
+      total += lowLimit * lowRate;
+      const highPart = Math.min(gross, highLimit) - lowLimit;
+      if (highPart > 0) total += highPart * highRate;
+
+      return total;
+    }
+
+    function calculateTaxOnRaise(currentSalary, raiseAmount) {
+      let remainingRaise = raiseAmount;
+      let taxTotal = 0;
+      let previousLimit = 0;
+
+      for (const bracket of TAX_BRACKETS_2025) {
+        if (remainingRaise <= 0) break;
+
+        const bracketStart = previousLimit;
+        const bracketEnd = bracket.limit;
+
+        const spaceInBracket = Math.max(0, bracketEnd - Math.max(currentSalary, bracketStart));
+
+        if (spaceInBracket > 0) {
+          const taxableHere = Math.min(remainingRaise, spaceInBracket);
+          taxTotal += taxableHere * bracket.rate;
+          remainingRaise -= taxableHere;
+        }
+
+        previousLimit = bracketEnd;
+      }
+
+      return taxTotal;
+    }
+
+    function formatCurrency(num) {
+      return num.toLocaleString('he-IL', {
+        style: 'currency',
+        currency: 'ILS',
+        maximumFractionDigits: 0
+      });
+    }
+
+    function onCalculate() {
+      const currentSalary = Number(document.getElementById('currentSalary').value) || 0;
+      const raiseAmount = Number(document.getElementById('raiseAmount').value) || 0;
+
+      const pension = document.getElementById('pension').checked;
+      const hishtalmut = document.getElementById('hishtalmut').checked;
+      const bl = document.getElementById('bituachLeumi').checked;
+
+      const taxRaiseOnly = calculateTaxOnRaise(currentSalary, raiseAmount);
+
+      let deductionsRaiseOnly = 0;
+      if (pension) deductionsRaiseOnly += raiseAmount * 0.06;
+      if (hishtalmut) deductionsRaiseOnly += raiseAmount * 0.025;
+      if (bl) deductionsRaiseOnly += (calculateBL(currentSalary + raiseAmount) - calculateBL(currentSalary));
+
+      const netRaiseOnly = raiseAmount - taxRaiseOnly - deductionsRaiseOnly;
+
+      document.getElementById('result').innerHTML = `
+        <h3>חישוב תוספת בלבד</h3>
+        <div><strong>תוספת ברוטו:</strong> ${formatCurrency(raiseAmount)}</div>
+        <div><strong>מס על התוספת:</strong> ${formatCurrency(taxRaiseOnly)}</div>
+        <div><strong>ניכויים על התוספת:</strong> ${formatCurrency(deductionsRaiseOnly)}</div>
+        <div style="margin-top:10px;font-size:18px;">
+          <strong>תוספת נטו שתיכנס לבנק:</strong> ${formatCurrency(netRaiseOnly)}
+        </div>
+      `;
+    }
+
+    document.getElementById('calcBtn').addEventListener('click', onCalculate);
+    onCalculate();
+  </script>
+</body>
+
+</html>
